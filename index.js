@@ -12,25 +12,25 @@ const JWT_SECRET = process.env.JWT_SECRET || "secret123";
 app.use(cors());
 app.use(express.json());
 
-// MongoDB
+// MongoDB Connection
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.f4ofb.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { serverApi: { version: ServerApiVersion.v1 } });
 
 let budgetCollection;
-let questionsCollection; // add questions collection
-const database = client.db("studenttoolkits_collections").collection("collections")
-
-
+let questionsCollection;
+let collectionsCollection;
 
 async function run() {
   try {
     await client.connect();
+    console.log("✅ MongoDB Connected");
+
     const db = client.db("studenttoolkits_collections");
     budgetCollection = db.collection("budgets");
-    questionsCollection = db.collection("questions"); // initialize questions
-    console.log("MongoDB Connected ✅");
+    questionsCollection = db.collection("questions");
+    collectionsCollection = db.collection("collections");
 
-    // Generate JWT
+    // ✅ JWT Generate
     app.post('/jwt', (req, res) => {
       const { uid, email } = req.body;
       if (!uid) return res.status(400).json({ message: "UID missing" });
@@ -38,10 +38,11 @@ async function run() {
       res.json({ token });
     });
 
-    // JWT Middleware
+    // ✅ JWT Verify Middleware
     const verifyJWT = (req, res, next) => {
       const authHeader = req.headers.authorization;
       if (!authHeader) return res.status(401).json({ message: "Unauthorized" });
+
       const token = authHeader.split(" ")[1];
       jwt.verify(token, JWT_SECRET, (err, decoded) => {
         if (err) return res.status(403).json({ message: "Forbidden" });
@@ -50,7 +51,7 @@ async function run() {
       });
     };
 
-    // POST: Add transaction
+    // ✅ POST: Add transaction
     app.post('/budgettracker', verifyJWT, async (req, res) => {
       const { uid, type, amount } = req.body;
       if (uid !== req.decoded.uid) return res.status(403).json({ message: "Forbidden" });
@@ -61,7 +62,7 @@ async function run() {
       res.status(201).json(result);
     });
 
-    // GET: Get all transactions of a user
+    // ✅ GET: All transactions for a user
     app.get('/budgettracker/:uid', verifyJWT, async (req, res) => {
       const uid = req.params.uid;
       if (uid !== req.decoded.uid) return res.status(403).json({ message: "Forbidden" });
@@ -69,26 +70,21 @@ async function run() {
       res.json(result);
     });
 
-    // **GET: Fetch all questions**
-    // MongoDB
-const database = client.db("studenttoolkits_collections").collection("collections"); // your collection
-
-// GET: Fetch all questions
-app.get('/allquestions', async (req, res) => {
-  try {
-    const questions = await database.find({}).toArray(); // use database variable
-    res.json(questions);
-  } catch (err) {
-    res.status(500).json({ message: "Error fetching questions", err });
-  }
-});
-
+    // ✅ GET: All questions
+    app.get('/allquestions', async (req, res) => {
+      try {
+        const questions = await collectionsCollection.find({}).toArray();
+        res.json(questions);
+      } catch (err) {
+        res.status(500).json({ message: "Error fetching questions", error: err });
+      }
+    });
 
   } finally {
-    // keep connection open
+    // Connection open রাখার জন্য কিছু লাগবে না
   }
 }
 run().catch(console.dir);
 
-app.get('/', (req, res) => res.send("Server running"));
-app.listen(port, () => console.log(`Server running on port ${port}`));
+app.get('/', (req, res) => res.send("🚀 Server running"));
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
